@@ -2,10 +2,6 @@
 
 
 
-Načítání Facebook postů v Nette Framework
-
-nacitani-facebook-postu-v-nette-framework
-
 Na jednom projektu jsem narazil na potřebu zobrazovat posty z Facebooku na klientově stránce. Inu začal jsem psát prototyp jak bych danou věc řešil. Prototyp jsem "spíchnul" za hodinku, ale bylo to uděláno tak trošku na hulváta. Tak jsem si řekl že to postupně přepíšu tak jak by to třeba napsal nějaký zkušený programátor s Nette frameworkem. Na [http://srazy.info/nettefwpivo](http://srazy.info/nettefwpivo) jsem danou věc přednesl a Nette guruové mi přislíbili odbornější konzultace.
 
 Článek není psán jako how-to \(na takovém článku zapracuji\) Je psán jak jsem postupoval, co jsem napsal, následně zavrhul nebo přepsal. Proto se nedivte, že tu třeba pracuji s Nette Cache, kterou v zápětí odstraním. Při čtení je dobré koukat na konkrétní [commity](https://github.com/chemix/Nette-Facebook-Reader/commits/master) a článek brát jako "přemýšlení nahlas" k těmto commitům.
@@ -68,106 +64,111 @@ commit: [added blank Import Presenter](https://github.com/chemix/Nette-Facebook-
 
 Přidáme si do _composer.json_ závislost na Facebook SDK
 
-/--code json "require": { "php": "&gt;= 5.3.7", "nette/nette": "~2.2.0", "dg/adminer-custom": "~1.0", "facebook/php-sdk-v4" : "4.0.\*" },
-
 ```text
+    "require": {
+        "php": ">= 5.3.7",
+        "nette/nette": "~2.2.0",
+        "dg/adminer-custom": "~1.0",
+        "facebook/php-sdk-v4" : "4.0.*"
+    },
+```
+
 a stahneme si ho pomoci `composer update`.
 
-Přihlásime se na Facebook Developers  http://developers.facebook.com a vytvoříme novou aplikaci.
+Přihlásime se na Facebook Developers [http://developers.facebook.com](http://developers.facebook.com) a vytvoříme novou aplikaci.
 
-[* /data/articles/1/facebook-developer.png .(Facebook Developer) *]
+\[ _/data/articles/1/facebook-developer.png .\(Facebook Developer\)_ \]
 
 Stačí nám vyplnit pouze její název
 
-[* /data/articles/1/create-new-app.png .(Create new App) *]
+\[ _/data/articles/1/create-new-app.png .\(Create new App\)_ \]
 
 a zjistíme si Facebook App ID a App Secret
 
-[* /data/articles/1/facebook-app-ids.png .(Facebook App IDs) *]
+\[ _/data/articles/1/facebook-app-ids.png .\(Facebook App IDs\)_ \]
 
 Na hulváta si zkusíme načíst data skrze Facebook Graph Api. V našem Import Presenteru přidáme do hlavičky
-```
-
-use Facebook\FacebookRequest; use Facebook\FacebookRequestException; use Facebook\FacebookSession; use Tracy\Dumper;
 
 ```text
+use Facebook\FacebookRequest;
+use Facebook\FacebookRequestException;
+use Facebook\FacebookSession;
+use Tracy\Dumper;
+```
+
 a metodu přepíšeme podle ukázky z dokumentace k PHP Facebook SDK
-```
-
-public function renderDefault\(\) { FacebookSession::setDefaultApplication\('YOUR\_APP\_ID', 'YOUR\_APP\_SECRET'\);
 
 ```text
-$session = FacebookSession::newAppSession();
-$data = array();
+public function renderDefault()
+{
+    FacebookSession::setDefaultApplication('YOUR_APP_ID', 'YOUR_APP_SECRET');
 
-try {
-    $request = new FacebookRequest($session, 'GET', '/nettefw/feed');
-    $response = $request->execute();
-    $posts = $response->getGraphObject()->asArray();
+    $session = FacebookSession::newAppSession();
+    $data = array();
 
-    $data = $posts['data'];
-} catch (FacebookRequestException $ex) {
-    // Session not valid, Graph API returned an exception with the reason.
-    echo $ex->getMessage();
-    exit();
-} catch (\Exception $ex) {
-    // Graph API returned info, but it may mismatch the current app or have expired.
-    echo $ex->getMessage();
-    exit();
+    try {
+        $request = new FacebookRequest($session, 'GET', '/nettefw/feed');
+        $response = $request->execute();
+        $posts = $response->getGraphObject()->asArray();
+
+        $data = $posts['data'];
+    } catch (FacebookRequestException $ex) {
+        // Session not valid, Graph API returned an exception with the reason.
+        echo $ex->getMessage();
+        exit();
+    } catch (\Exception $ex) {
+        // Graph API returned info, but it may mismatch the current app or have expired.
+        echo $ex->getMessage();
+        exit();
+    }
+
+    Dumper::dump($data);
 }
-
-Dumper::dump($data);
 ```
 
-}
-
-```text
 po zkouknutí výstupu bychom měli vidět dump pole o 25 položkách
 
-[* /data/articles/1/dump-array-25.png .(dump array) *]
+\[ _/data/articles/1/dump-array-25.png .\(dump array\)_ \]
 
 Malinko si zjednodušíme ošetření chyb jen na ukončení aplikace.
-```
-
-} catch \(\Exception $ex\) { throw $ex; $this-&gt;terminate\(\); }
 
 ```text
+} catch (\Exception $ex) {
+    throw $ex;
+    $this->terminate();
+}
+```
+
 commit: [add dependence on Facebook SDK to composer and small typo updates](https://github.com/chemix/Nette-Facebook-Reader/commit/09420de69abc424fe3b06a6a201dd23597465967)
 
 commit: [load data from Facebook - dirty version](https://github.com/chemix/Nette-Facebook-Reader/commit/f7abe600372f3e77cb7486dbb393bb85c300e7ed)
 
-commit: [only one catch and application->terminate()](https://github.com/chemix/Nette-Facebook-Reader/commit/17cf92295d9b10da4502d34ea870933ac499983e)
+commit: [only one catch and application-&gt;terminate\(\)](https://github.com/chemix/Nette-Facebook-Reader/commit/17cf92295d9b10da4502d34ea870933ac499983e)
 
+### Cache, ať při vývoji nečekáme
 
-
-
-Cache, ať při vývoji nečekáme
------------------------------
-
-Přidáme si možnost cache pro požadavek. (Hlavně si tím urychlíme další rozšiřování, přeci jen čekat 10 sec na každý refresh mě nebaví).
+Přidáme si možnost cache pro požadavek. \(Hlavně si tím urychlíme další rozšiřování, přeci jen čekat 10 sec na každý refresh mě nebaví\).
 
 O cachovaní se nám postara Nette Framework a jeho Nette\Caching\Cache;
 
 Přidáme do use sekce
-```
-
-use Nette\Caching\Cache;
 
 ```text
-Abychom mohli vytvořit instanci třídy Cache tak jí musíme předat nějaký cache storage kam si bude ukládat data. Viz API dokumentace [Nette\Caching\Cache](http://api.nette.org/2.2.1/Nette.Caching.Cache.html#___construct)
-
-A ten si necháme poslat (injectnout) do třídy pomoci Nette Dependenci Injection. Jediné co musíme udělat je definovat public property $cacheStorage typu \Nette\Caching\IStorage a pomocí anotace @inject nám framework zařídí vše potřebné.
+use Nette\Caching\Cache;
 ```
 
-class ImportPresenter extends BasePresenter { /\*\*
+Abychom mohli vytvořit instanci třídy Cache tak jí musíme předat nějaký cache storage kam si bude ukládat data. Viz API dokumentace [Nette\Caching\Cache](http://api.nette.org/2.2.1/Nette.Caching.Cache.html#___construct)
 
-* @var \Nette\Caching\IStorage @inject
+A ten si necháme poslat \(injectnout\) do třídy pomoci Nette Dependenci Injection. Jediné co musíme udělat je definovat public property $cacheStorage typu \Nette\Caching\IStorage a pomocí anotace @inject nám framework zařídí vše potřebné.
 
-  \*/
-
-  public $cacheStorage;
-
-  \`\`\`
+```text
+class ImportPresenter extends BasePresenter
+{
+    /**
+     * @var \Nette\Caching\IStorage @inject
+     */
+    public $cacheStorage;
+```
 
 hup, a v našich metodách se ke storage dostaneme snadno pomocí `$this->cacheStorage`
 
@@ -232,12 +233,17 @@ Dalším krokem je uložit si získána data do databáze. Pro práci s databáz
 
 Uživatel bude facebookwall a s heslem 'tajneheslo' bude mít přístup ke všem databázím začínající facebookwall\_ v našem vývojovém případě konkrétně k databázi facebookwall\_devel
 
-/--code sql CREATE DATABASE `facebookwall_devel` COLLATE 'utf8_czech\_ci'; CREATE USER 'facebookwall'@'localhost' IDENTIFIED BY 'tajneheslo'; GRANT USAGE ON  .  TO 'facebookwall'@'localhost' IDENTIFIED BY 'tajneheslo' WITH MAX\_QUERIES\_PER\_HOUR 0 MAX\_CONNECTIONS\_PER\_HOUR 0 MAX\_UPDATES\_PER\_HOUR 0 MAX\_USER\_CONNECTIONS 0 ; GRANT ALL PRIVILEGES ON \`facebookwall\_%\` . \* TO 'facebookwall'@'localhost'; FLUSH PRIVILEGES;
-
 ```text
+CREATE DATABASE `facebookwall_devel` COLLATE 'utf8_czech_ci';
+CREATE USER 'facebookwall'@'localhost' IDENTIFIED BY 'tajneheslo';
+GRANT USAGE ON * . * TO 'facebookwall'@'localhost' IDENTIFIED BY 'tajneheslo' WITH MAX_QUERIES_PER_HOUR 0 MAX_CONNECTIONS_PER_HOUR 0 MAX_UPDATES_PER_HOUR 0 MAX_USER_CONNECTIONS 0 ;
+GRANT ALL PRIVILEGES ON `facebookwall\_%` . * TO 'facebookwall'@'localhost';
+FLUSH PRIVILEGES;
+```
+
 a vytvoříme si tabulku kam si posty budeme ukládat.
 
-/--code sql
+```text
 CREATE TABLE `facebook_wallposts` (
   `id` varchar(100) CHARACTER SET ascii NOT NULL,
   `created_time` datetime NOT NULL,
@@ -659,24 +665,27 @@ teď ale příjde ta zajímavější část.
 
 Jako první nahradíme v _composer.json_ Facebook/SDK za [Kdyby/Facebook](https://github.com/Kdyby/Facebook)
 
-/--code json "require": { "php": "&gt;= 5.3.7", "nette/nette": "~2.2.0", "dg/adminer-custom": "~1.0", "kdyby/facebook" : "dev-master" },
-
 ```text
-a aktualizujeme composer pomocí `composer update`. Smažeme náš "hloupoučký" *FacebookSessionManager.php* a odebereme i jeho registraci do services v *config.neon*, zde naopak přidáme sekci extensions a do ní registrujeme Kdyby Facebook
+    "require": {
+        "php": ">= 5.3.7",
+        "nette/nette": "~2.2.0",
+        "dg/adminer-custom": "~1.0",
+        "kdyby/facebook" : "dev-master"
+    },
 ```
 
-extensions: facebook: Kdyby\Facebook\DI\FacebookExtension
+a aktualizujeme composer pomocí `composer update`. Smažeme náš "hloupoučký" _FacebookSessionManager.php_ a odebereme i jeho registraci do services v _config.neon_, zde naopak přidáme sekci extensions a do ní registrujeme Kdyby Facebook
+
+```text
+extensions:
+    facebook: Kdyby\Facebook\DI\FacebookExtension
 
 services:
-
-* App\Model\UserManager
-* App\RouterFactory
-
-  router: @App\RouterFactory::createRouter
-
-* App\Model\FacebookWallposts
-
-  \`\`\`
+    - App\Model\UserManager
+    - App\RouterFactory
+    router: @App\RouterFactory::createRouter
+    - App\Model\FacebookWallposts
+```
 
 Tato extension vyžaduje v configu Facebook App ID a Facebook Secret. Proto do lokálního _config.local.neon_ přemístíme tyto informace ze sekce params \(kam jsme si je uložili\) do sekce facebook.
 
@@ -996,25 +1005,51 @@ to samé uděláme i pro druhou metoru _actionDisablePost_. Upravíme si šablon
 
 a pak celé to rozhejbání v JavaScriptu. Pokud kliknem na odkaz co má třídu _.ajax_ tak stopnem klasické volání, a zavoláme XHR požadavek. Pokud se nám vrátí message, že je post disablován, tak prohodíme zobrazení tlačítek. \(v opačném případě také\) Plus pár visuálních drobností \(disablování butonu po kliknutí, změna kurzoru na hodinky\)
 
-/--code javascript // Ajax click in admin $\('body'\).on\('click', 'a.ajax', function \(event\) { event.preventDefault\(\); event.stopImmediatePropagation\(\); var link = $\(this\); if \(link.hasClass\('disabled'\)\) { return false; } link.css\('cursor', 'wait'\); link.addClass\('disabled'\); $.post\(this.href, function \(data\) { if \(data.message == 'Post disabled'\) { link.parent\(\).parent\(\).find\('.disable'\).addClass\('hide'\); link.parent\(\).parent\(\).find\('.enable'\).removeClass\('hide'\); } else { // enabled link.parent\(\).parent\(\).find\('.disable'\).removeClass\('hide'\); link.parent\(\).parent\(\).find\('.enable'\).addClass\('hide'\); } link.removeClass\('disabled'\); link.css\('cursor', 'default'\); }\); }\);
-
 ```text
-commit: [ajax version of enable and disable post](https://github.com/chemix/Nette-Facebook-Reader/commit/c9b5a8fce0a63c3e0c3f69e11b0549d860d871db)
-
-Úprava JSON komunikace
-----------------------
-
-Porovnávat message co se stalo není moc "profi", tak si zavedem nějakou proměnou s akcí a status zdali se provedla správně. To s použitím payload proměnné je vcelku snadné
+// Ajax click in admin
+$('body').on('click', 'a.ajax', function (event) {
+    event.preventDefault();
+    event.stopImmediatePropagation();
+    var link = $(this);
+    if (link.hasClass('disabled')) {
+        return false;
+    }
+    link.css('cursor', 'wait');
+    link.addClass('disabled');
+    $.post(this.href, function (data) {
+        if (data.message == 'Post disabled') {
+            link.parent().parent().find('.disable').addClass('hide');
+            link.parent().parent().find('.enable').removeClass('hide');
+        } else {
+            // enabled
+            link.parent().parent().find('.disable').removeClass('hide');
+            link.parent().parent().find('.enable').addClass('hide');
+        }
+        link.removeClass('disabled');
+        link.css('cursor', 'default');
+    });
+});
 ```
 
-if \($this-&gt;isAjax\(\)\) { $this-&gt;payload-&gt;message = 'Post enabled'; $this-&gt;payload-&gt;action = 'enable'; $this-&gt;payload-&gt;status = '1'; $this-&gt;sendPayload\(\);
+commit: [ajax version of enable and disable post](https://github.com/chemix/Nette-Facebook-Reader/commit/c9b5a8fce0a63c3e0c3f69e11b0549d860d871db)
 
-} else {
+### Úprava JSON komunikace
+
+Porovnávat message co se stalo není moc "profi", tak si zavedem nějakou proměnou s akcí a status zdali se provedla správně. To s použitím payload proměnné je vcelku snadné
 
 ```text
+if ($this->isAjax()) {
+    $this->payload->message = 'Post enabled';
+    $this->payload->action = 'enable';
+    $this->payload->status = '1';
+    $this->sendPayload();
+
+} else {
+```
+
 v JavaScriptu se pak zeptáme co se dělo a jak to dopadlo a zobrazíme dynamicky flash zprávu.
 
-/--code javascript
+```text
 var flashMessage = function(message)
 {
     $($('body')[0]).prepend($('<div class="flash info">'+message+'</div>'));
@@ -1104,92 +1139,118 @@ kód se nám dosti zjednodušil. Ještě dáme pryč celý náš JavaScript mech
 
 jediné co potřebujeme je zavolat její inicializaci.
 
-/--code javascript $\(function \(\) { $.nette.init\(\); }\);
-
 ```text
+$(function () {
+    $.nette.init();
+});
+```
+
 pěkné zjednodušení, že? Kabelama se nám přenáší jen co se "opravdu" změnilo
 
-[* /data/articles/1/snippets-response.png .(json snippets response) *]
+\[ _/data/articles/1/snippets-response.png .\(json snippets response\)_ \]
 
 commit: [use snippets and nette.ajax.js](https://github.com/chemix/Nette-Facebook-Reader/commit/151202a775d65adeccb6a8a991fc759545d935c7)
 
+### Bacha na F5
 
-Bacha na F5
------------
-
-Zpracování formulářu v Nette funguje na bázi signálu (handle) a tam abychom se vyhnuli problému s refreshem použijeme *redirect()*. Stejně je tomu i v našem případě se signály na disablování a enablování postu. Pokud se nejedná o ajaxový požadavek, tak přesměrujem.
-```
-
-// F5 protection without JS if \(!$this-&gt;isAjax\(\)\){ $this-&gt;redirect\('this'\); }
+Zpracování formulářu v Nette funguje na bázi signálu \(handle\) a tam abychom se vyhnuli problému s refreshem použijeme _redirect\(\)_. Stejně je tomu i v našem případě se signály na disablování a enablování postu. Pokud se nejedná o ajaxový požadavek, tak přesměrujem.
 
 ```text
-commit: [redirect after handle signal without JS](https://github.com/chemix/Nette-Facebook-Reader/commit/dfbb0431ab2ff2225f8fba55ae79ee0ece7fabf2)
-
-
-Posílání opravdu jen toho co je třeba
--------------------------------------
-
-Ajaxové požadavky sviští o 106 jen se nám v každém requestu ajaxem posílá celá tabulka postů. Ale my změnili jen jeden, co kdyby se tedy posílal jen tenhle jeden spolu s flash message? Lze. Technika se nazývá [dynamické snippety](http://doc.nette.org/cs/2.1/ajax#toc-dynamicke-snippety)
-
-každý řádek zabalíme do jednoznačne identifikovatelného snippetu (použijeme n makro)
-```
-
-{snippet wallposts} {foreach $wallPosts as $post} 
-
-```text
-a přidáme trochu logiky do handle. V případě že se jedná o ajaxový požadavek, načteme jen aktuálně zpracovávaný řádek a do šablony ho pošleme jako "seznam všech postů", v normálním požadavku pošleme do šablony posty všechny.
-```
-
-public function handleEnablePost\($postId\) { if \($this-&gt;wallposts-&gt;enablePost\($postId\)\) { $this-&gt;template-&gt;wallPosts = $this-&gt;isAjax\(\) ? array\($this-&gt;wallposts-&gt;getOne\($postId\)\) : $this-&gt;wallposts-&gt;getAllPosts\(\); $this-&gt;flashMessage\('Post enabled'\); $this-&gt;redrawControl\('flashes'\); $this-&gt;redrawControl\('wallposts'\);
-
-```text
-[* /data/articles/1/dynamic-snippets.png .(json dynamic snippets response) *]
-
-jelikož se handle zpracovává dříve než render viz [životní cyklus presenteru](http://doc.nette.org/cs/2.1/presenters#toc-zivotni-cyklus-presenteru), tak pokud uživatel bez JavaScriptu změnil viditelnost postu, tak už do šablony poslal seznam všech postů a render už tuto věc dělat nemusí, tak si to ošetříme.
-```
-
-public function renderDefault\(\) { if \(!isset\($this-&gt;template-&gt;wallPosts\)\) { $this-&gt;template-&gt;wallPosts = $this-&gt;wallposts-&gt;getAllPosts\(\); } }
-
-```text
-commit: [Add method getOne to Model\FacebookWallposts](https://github.com/chemix/Nette-Facebook-Reader/commit/229592e47887ba5160f627041a9f2698ddaa3e08)
-
-commit: [use dynamic snippets](https://github.com/chemix/Nette-Facebook-Reader/commit/d4e73defeb07033c4da59f5c3ee4892abbeb63e6)
-
-Zničíme duplicitní kód
-----------------------
-
-Metody *handleEnablePost* a *handleDisablePost($postId)* mají dost kódu úplně stejného. Proto mě napadlo že bych je nějak předělal.
-
-**První** nápad byl mít metodu *handleChangePostStatus($postId, $actionType)*, kde by jako druhý parametr byl typ akce, disable nebo enable. Dva parametry se mi nakonec nelíbily.
-
-#### TIP: rezervovaná slova
-zde jsem původně měl parametr pojmenová pouze *$action* a ouhle nějak to nefungovalo. Narazil jsem na pojem rezervovaných proměnných. Tak bacha na ně ;-) Proto i submit button ve formuláři by neměl mít jméno *action*. Další slova jsou: *$do*, *$_fid*, (TODO) .. a *$action*
-
-**Druhým** nápadem bylo mít metodu *handleTogglePostStatus($postId)*, která by si zjistila zda je článek povolen a zakázala by ho nebo opačně. Zjistil jsem, že by status ani zjištovat nemusela jen by SQL update otočil hodnotu (nezkoušel jsem). Toto řešení jsem zavrhl kvůli zobrazení ve dvou oknech současně. Chování by mohlo být nelogické.
-
-**Třetím** nápadem bylo vytáhnout společnou logiku do vlastní metody a u něj jsem zůstal.
-```
-
-protected function afterTogglePostStatus\($status, $postId, $message\) { if \($status\) { $this-&gt;template-&gt;wallPosts = $this-&gt;isAjax\(\) ? array\($this-&gt;wallposts-&gt;getOne\($postId\)\) : $this-&gt;wallposts-&gt;getAllPosts\(\);
-
-```text
-    $this->flashMessage($message);
-    $this->redrawControl('flashes');
-    $this->redrawControl('wallposts');
-}
 // F5 protection without JS
 if (!$this->isAjax()){
     $this->redirect('this');
 }
 ```
 
+commit: [redirect after handle signal without JS](https://github.com/chemix/Nette-Facebook-Reader/commit/dfbb0431ab2ff2225f8fba55ae79ee0ece7fabf2)
+
+### Posílání opravdu jen toho co je třeba
+
+Ajaxové požadavky sviští o 106 jen se nám v každém requestu ajaxem posílá celá tabulka postů. Ale my změnili jen jeden, co kdyby se tedy posílal jen tenhle jeden spolu s flash message? Lze. Technika se nazývá [dynamické snippety](http://doc.nette.org/cs/2.1/ajax#toc-dynamicke-snippety)
+
+každý řádek zabalíme do jednoznačne identifikovatelného snippetu \(použijeme n makro\)
+
+```text
+{snippet wallposts}
+    {foreach $wallPosts as $post}
+        <div class="row" n:snippet="item-$post->id">
+```
+
+a přidáme trochu logiky do handle. V případě že se jedná o ajaxový požadavek, načteme jen aktuálně zpracovávaný řádek a do šablony ho pošleme jako "seznam všech postů", v normálním požadavku pošleme do šablony posty všechny.
+
+```text
+public function handleEnablePost($postId)
+{
+    if ($this->wallposts->enablePost($postId)) {
+        $this->template->wallPosts = $this->isAjax()
+            ? array($this->wallposts->getOne($postId))
+            : $this->wallposts->getAllPosts();
+        $this->flashMessage('Post enabled');
+        $this->redrawControl('flashes');
+        $this->redrawControl('wallposts');
+```
+
+\[ _/data/articles/1/dynamic-snippets.png .\(json dynamic snippets response\)_ \]
+
+jelikož se handle zpracovává dříve než render viz [životní cyklus presenteru](http://doc.nette.org/cs/2.1/presenters#toc-zivotni-cyklus-presenteru), tak pokud uživatel bez JavaScriptu změnil viditelnost postu, tak už do šablony poslal seznam všech postů a render už tuto věc dělat nemusí, tak si to ošetříme.
+
+```text
+public function renderDefault()
+{
+    if (!isset($this->template->wallPosts)) {
+        $this->template->wallPosts = $this->wallposts->getAllPosts();
+    }
+}
+```
+
+commit: [Add method getOne to Model\FacebookWallposts](https://github.com/chemix/Nette-Facebook-Reader/commit/229592e47887ba5160f627041a9f2698ddaa3e08)
+
+commit: [use dynamic snippets](https://github.com/chemix/Nette-Facebook-Reader/commit/d4e73defeb07033c4da59f5c3ee4892abbeb63e6)
+
+### Zničíme duplicitní kód
+
+Metody _handleEnablePost_ a _handleDisablePost\($postId\)_ mají dost kódu úplně stejného. Proto mě napadlo že bych je nějak předělal.
+
+**První** nápad byl mít metodu _handleChangePostStatus\($postId, $actionType\)_, kde by jako druhý parametr byl typ akce, disable nebo enable. Dva parametry se mi nakonec nelíbily.
+
+**TIP: rezervovaná slova**
+
+zde jsem původně měl parametr pojmenová pouze _$action_ a ouhle nějak to nefungovalo. Narazil jsem na pojem rezervovaných proměnných. Tak bacha na ně ;-\) Proto i submit button ve formuláři by neměl mít jméno _action_. Další slova jsou: _$do_, _$\_fid_, \(TODO\) .. a _$action_
+
+**Druhým** nápadem bylo mít metodu _handleTogglePostStatus\($postId\)_, která by si zjistila zda je článek povolen a zakázala by ho nebo opačně. Zjistil jsem, že by status ani zjištovat nemusela jen by SQL update otočil hodnotu \(nezkoušel jsem\). Toto řešení jsem zavrhl kvůli zobrazení ve dvou oknech současně. Chování by mohlo být nelogické.
+
+**Třetím** nápadem bylo vytáhnout společnou logiku do vlastní metody a u něj jsem zůstal.
+
+```text
+protected function afterTogglePostStatus($status, $postId, $message)
+{
+    if ($status) {
+        $this->template->wallPosts = $this->isAjax()
+            ? array($this->wallposts->getOne($postId))
+            : $this->wallposts->getAllPosts();
+
+        $this->flashMessage($message);
+        $this->redrawControl('flashes');
+        $this->redrawControl('wallposts');
+    }
+    // F5 protection without JS
+    if (!$this->isAjax()){
+        $this->redirect('this');
+    }
 }
 
-public function handleEnablePost\($postId\) { $status = $this-&gt;wallposts-&gt;enablePost\($postId\); $this-&gt;afterTogglePostStatus\($status, $postId, 'Post enabled'\); }
+public function handleEnablePost($postId)
+{
+    $status = $this->wallposts->enablePost($postId);
+    $this->afterTogglePostStatus($status, $postId, 'Post enabled');
+}
 
-public function handleDisablePost\($postId\) { $status = $this-&gt;wallposts-&gt;disablePost\($postId\); $this-&gt;afterTogglePostStatus\($status, $postId, 'Post disabled'\); }
-
-\`\`\`
+public function handleDisablePost($postId)
+{
+    $status = $this->wallposts->disablePost($postId);
+    $this->afterTogglePostStatus($status, $postId, 'Post disabled');
+}
+```
 
 commit: [refactor handleDisable and handleEnable](https://github.com/chemix/Nette-Facebook-Reader/commit/8cc54bf7e2898fffa6512ccb89be3ebd12ab722a)
 
